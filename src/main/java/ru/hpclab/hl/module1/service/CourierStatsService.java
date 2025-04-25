@@ -6,37 +6,35 @@ import ru.hpclab.hl.module1.client.DeliveryClient;
 import ru.hpclab.hl.module1.client.ParcelClient;
 import ru.hpclab.hl.module1.dto.*;
 
+
+import lombok.RequiredArgsConstructor;
+import ru.hpclab.hl.module1.service.statistics.ObservabilityService;
+
 import java.time.Month;
 import java.util.*;
 import java.util.stream.Collectors;
 
-
 @Service
-
+@RequiredArgsConstructor
 public class CourierStatsService {
 
     private final CourierClient courierClient;
     private final DeliveryClient deliveryClient;
     private final ParcelClient parcelClient;
 
-    public CourierStatsService(CourierClient courierClient, DeliveryClient deliveryClient, ParcelClient parcelClient) {
-        this.courierClient = courierClient;
-        this.deliveryClient = deliveryClient;
-        this.parcelClient = parcelClient;
-    }
+
+    private final ObservabilityService observabilityService;
 
     public List<CourierStatsDTO> getStatsForAllCouriers() {
+
+        String metric = getClass().getSimpleName() + ":getStatsForAllCouriers";
+        observabilityService.start(metric);
+
         List<DeliveryDTO> deliveries = Optional.ofNullable(deliveryClient.getAllDeliveries())
                 .map(Arrays::asList)
                 .orElse(Collections.emptyList());
 
-        List<CourierDTO> couriers = Optional.ofNullable(courierClient.getAllCouriers())
-                .map(Arrays::asList)
-                .orElse(Collections.emptyList());
-
-        Map<Long, String> courierNamesById = couriers.stream()
-                .collect(Collectors.toMap(CourierDTO::getId, CourierDTO::getFullName));
-
+        Map<Long, String> courierNamesById = new HashMap<>();
         Map<String, Map<Month, Double>> statsByCourier = new HashMap<>();
 
         for (DeliveryDTO delivery : deliveries) {
@@ -45,7 +43,14 @@ public class CourierStatsService {
             ParcelDTO parcel = parcelClient.getById(delivery.getParcelId());
             if (parcel == null) continue;
 
-            String courierName = courierNamesById.get(delivery.getCourierId());
+            Long courierId = delivery.getCourierId();
+            CourierDTO courier = courierClient.getCourierById(courierId);
+
+            if (courier != null) {
+                courierNamesById.putIfAbsent(courierId, courier.getFullName());
+            }
+
+            String courierName = courierNamesById.get(courierId);
             if (courierName == null) continue;
 
             Month month = delivery.getDeliveryDate().getMonth();
@@ -56,9 +61,11 @@ public class CourierStatsService {
                     .merge(month, weight, Double::sum);
         }
 
+
+        observabilityService.stop(metric);
+
         return statsByCourier.entrySet().stream()
                 .map(e -> new CourierStatsDTO(e.getKey(), e.getValue()))
-                .toList();
+                .collect(Collectors.toList());
     }
-
 }
