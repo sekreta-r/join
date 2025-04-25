@@ -14,7 +14,7 @@ public class AdditionalStatsController {
 
     private final CourierStatsService courierStatsService;
 
-    @PostMapping("/couriers")
+    @GetMapping("/couriers")
     public List<CourierStatsDTO> getAllCourierStats() {
         return courierStatsService.getStatsForAllCouriers();
     }

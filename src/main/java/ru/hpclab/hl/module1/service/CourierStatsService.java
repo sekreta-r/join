@@ -26,17 +26,17 @@ public class CourierStatsService {
     }
 
     public List<CourierStatsDTO> getStatsForAllCouriers() {
-        DeliveryDTO[] deliveries = deliveryClient.getAllDeliveries();
-        if (deliveries == null) deliveries = new DeliveryDTO[0];
+        List<DeliveryDTO> deliveries = Optional.ofNullable(deliveryClient.getAllDeliveries())
+                .map(Arrays::asList)
+                .orElse(Collections.emptyList());
 
-        CourierDTO[] couriers = courierClient.getAllCouriers();
-        if (couriers == null) couriers = new CourierDTO[0];
+        List<CourierDTO> couriers = Optional.ofNullable(courierClient.getAllCouriers())
+                .map(Arrays::asList)
+                .orElse(Collections.emptyList());
 
-        // Индекс курьеров по их ID
-        Map<Long, String> courierNamesById = Arrays.stream(couriers)
+        Map<Long, String> courierNamesById = couriers.stream()
                 .collect(Collectors.toMap(CourierDTO::getId, CourierDTO::getFullName));
 
-        // Статистика: имя курьера -> (месяц -> сумма веса)
         Map<String, Map<Month, Double>> statsByCourier = new HashMap<>();
 
         for (DeliveryDTO delivery : deliveries) {
@@ -56,9 +56,9 @@ public class CourierStatsService {
                     .merge(month, weight, Double::sum);
         }
 
-        // Преобразование в список DTO
         return statsByCourier.entrySet().stream()
                 .map(e -> new CourierStatsDTO(e.getKey(), e.getValue()))
                 .toList();
     }
+
 }
